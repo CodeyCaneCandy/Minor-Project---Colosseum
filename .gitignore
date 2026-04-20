@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+.env
+
+# Secrets
+.env
+gittoken.txt
+
+# Data (your local storage system)
+data/datasets/
+data/sessions/
+data/features/
+
+# OS files
+.DS_Store
+
+# Logs
+*.loggittoken.txt
+.env
