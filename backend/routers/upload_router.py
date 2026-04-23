@@ -39,6 +39,7 @@ async def upload_file(file: UploadFile = File(...)):
 
         # Save to session.json
         session_file = SESSIONS_DIR / "session.json"
+        print(f"DEBUG: Writing session to {session_file}")
         session_file.write_text(json.dumps(session_data, indent=2))
 
         return {"message": "File uploaded successfully", "session": session_data}
