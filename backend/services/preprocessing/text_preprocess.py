@@ -8,7 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 from sentence_transformers import SentenceTransformer
 
 # Reusing your excellent modular split utility
-from backend.services.preprocessing.train_test_split import split_dataset
+from services.preprocessing.train_test_split import split_dataset
 
 class TextPreprocessor:
     """

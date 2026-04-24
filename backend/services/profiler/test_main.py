@@ -9,8 +9,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # ── IMPORTS ──────────────────────────────────────────────────────────────────
-from backend.services.profiler.tabular_profiler import profile_tabular
-from backend.services.profiler.text_profiler    import profile_text
+from services.profiler.tabular_profiler import profile_tabular
+from services.profiler.text_profiler    import profile_text
 # from backend.services.profiler.image_profiler import profile_image   # Layer 2 todo
 
 

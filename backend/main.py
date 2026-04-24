@@ -6,6 +6,7 @@ from pathlib import Path
 from routers.upload_router import router as upload_router
 from routers.task_router   import router as task_router
 from routers.config_router import router as config_router
+from routers.evaluate_router import router as evaluate_router
 
 app = FastAPI(title="Colosseum API", version="1.0.0")
 
@@ -22,7 +23,7 @@ app.add_middleware(
 app.include_router(upload_router, prefix="/api")
 app.include_router(task_router,   prefix="/api")
 app.include_router(config_router, prefix="/api")
-
+app.include_router(evaluate_router, prefix="/api")
 # ── OPTIONAL: health check ────────────────────────────────────────────────────
 @app.get("/api/health")
 def health():
