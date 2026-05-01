@@ -36,6 +36,7 @@ def profile_tabular(file_path, target_column, problem_type):
     # =========================
     # 1. BASIC INFO
     # =========================
+    profile["dtype"] = "tabular"
     profile["n_rows"]    = len(df)
     profile["n_columns"] = df.shape[1]
     profile["separator"] = sep   # useful to log for debugging

@@ -14,8 +14,12 @@
         </header>
 
         <div class="setup-card">
+            <!-- STEP 1 -->
             <section id="step-upload" class="step active">
-                <div class="step-header"><span>01</span> Upload Dataset</div>
+                <div class="step-header">
+                    <span>01</span> Upload Dataset 
+                    <div class="tooltip">ⓘ<span class="tooltiptext">Provide the raw data. Colosseum will automatically profile it.</span></div>
+                </div>
                 <input type="file" id="fileInput" hidden>
                 <div class="drop-zone" id="dropZone">
                     <p>Drag & drop CSV or click to browse</p>
@@ -26,8 +30,12 @@
                 </div>
             </section>
 
+            <!-- STEP 2 -->
             <section id="step-task" class="step">
-                <div class="step-header"><span>02</span> Select Task</div>
+                <div class="step-header">
+                    <span>02</span> Select Task
+                    <div class="tooltip">ⓘ<span class="tooltiptext">Tell the engine what kind of problem you are solving so it loads the right models.</span></div>
+                </div>
                 <div class="grid-buttons">
                     <button type="button" onclick="selectTask('classification', 'tabular')" class="task-btn">Tabular Classification</button>
                     <button type="button" onclick="selectTask('regression', 'tabular')" class="task-btn">Tabular Regression</button>
@@ -35,8 +43,12 @@
                 </div>
             </section>
 
+            <!-- STEP 3 -->
             <section id="step-config" class="step">
-                <div class="step-header"><span>03</span> Final Configuration</div>
+                <div class="step-header">
+                    <span>03</span> Final Configuration
+                    <div class="tooltip">ⓘ<span class="tooltiptext">Specify the column you want to predict (Label) and any text features.</span></div>
+                </div>
                 <div class="form-group">
                     <label>Target Column (Label)</label>
                     <input type="text" id="targetCol" placeholder="e.g. quality or sentiment">
@@ -45,7 +57,38 @@
                     <label>Text Column</label>
                     <input type="text" id="textCol" placeholder="e.g. review_text">
                 </div>
-                <button type="button" id="finishBtn" class="btn-primary">Ready for Evaluation</button>
+                <button type="button" id="finishBtn" class="btn-primary">Lock Configuration</button>
+            </section>
+
+            <!-- STEP 4: NEW LIVE STREAM UI -->
+            <section id="step-stream" class="step">
+                <div class="step-header">
+                    <span>04</span> Model Gauntlet (Live)
+                    <div class="tooltip">ⓘ<span class="tooltiptext">Watch Layer 3 filter out incompatible models in real-time before training begins.</span></div>
+                </div>
+                
+                <button type="button" id="startEvalBtn" class="btn-primary" style="margin-bottom: 20px;">🚀 Fire Up The Engine</button>
+                
+                <div class="layer3-container hidden" id="liveUiContainer">
+                    <div class="model-roster">
+                        <h3>Master List</h3>
+                        <ul id="model-list">
+                            <li id="model-SVM">SVM</li>
+                            <li id="model-LogReg">Logistic Regression</li>
+                            <li id="model-NaiveBayes">Naive Bayes</li>
+                            <li id="model-KNN">KNN</li>
+                            <li id="model-DecisionTree">Decision Tree</li>
+                            <li id="model-RandomForest">Random Forest</li>
+                            <li id="model-XGBoost">XGBoost</li>
+                        </ul>
+                    </div>
+                    <div class="live-log-panel">
+                        <h3>System Logs <span class="status-dot"></span></h3>
+                        <div id="log-feed" class="log-feed-container"></div>
+                    </div>
+                </div>
+
+                <a href="http://localhost:8501" target="_blank" id="goToDashboardBtn" class="btn-success hidden" style="display:block; text-align:center; text-decoration:none; margin-top:20px;">📊 View Final Results in Dashboard</a>
             </section>
         </div>
 

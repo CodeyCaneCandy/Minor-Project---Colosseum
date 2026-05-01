@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
@@ -7,6 +7,7 @@ from routers.upload_router import router as upload_router
 from routers.task_router   import router as task_router
 from routers.config_router import router as config_router
 from routers.evaluate_router import router as evaluate_router
+from core.ws_manager import manager
 
 app = FastAPI(title="Colosseum API", version="1.0.0")
 
@@ -28,6 +29,22 @@ app.include_router(evaluate_router, prefix="/api")
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+# ── OPTIONAL: health check ────────────────────────────────────────────────────
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
+
+# ── LAYER 3: WEBSOCKET STREAM ─────────────────────────────────────────────────
+@app.websocket("/api/filter-stream")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep the pipe open. We only send data, we don't expect to receive.
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 # ── SERVE FRONTEND ────────────────────────────────────────────────────────────
 # Mounts frontend/index.html at /

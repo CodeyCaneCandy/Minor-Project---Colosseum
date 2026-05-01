@@ -122,6 +122,7 @@ def profile_text(file_path: str, text_column: str, target_column: str = None):
     # =========================================================================
     # 1. BASIC INFO
     # =========================================================================
+    profile["dtype"]       = "text"
     profile["n_rows"]       = len(df)
     profile["n_columns"]    = df.shape[1]
     profile["text_column"]  = text_column
