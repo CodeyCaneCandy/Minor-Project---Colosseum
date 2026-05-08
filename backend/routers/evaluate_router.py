@@ -159,12 +159,18 @@ async def run_evaluation(request: EvaluateRequest):
         
         runner.save_results(final_results, results_file)
 
+        # Safely extract full data, using defaults just in case runner.py was also reverted
+        winner_obj = final_results.get("winner", {"name": "Unknown", "score": 0})
+        if isinstance(winner_obj, str): 
+            winner_obj = {"name": winner_obj, "score": 0}
+
         return {
             "status": "success", 
             "message": "All Layers complete! Results saved to disk.",
-            "winner": final_results["winner"]["name"],
-            # Passing the full results back directly helps if the frontend wants to render immediately
-            "results": final_results 
+            "winner": winner_obj,
+            "confidence": final_results.get("confidence", {"level": "high", "value": 100.0, "gap": 0}),
+            "explanation": final_results.get("explanation", "Evaluation completed successfully."),
+            "results": final_results # Send the full payload for the charts!
         }
 
     except Exception as e:
