@@ -313,6 +313,26 @@ elif menu == "Results":
             with st.expander("Show raw LLM prompt"):
                 st.code(results["raw_prompt"], language="text")
 
+    
+    # --- CROSS-VALIDATION WARNINGS ---
+    st.subheader("🛡️ Stability Checks")
+    unstable_models = []
+    
+    for model_name, metrics in models_data.items():
+        # Check if the standard deviation across the 5 folds is suspiciously high (e.g., > 4%)
+        if metrics.get("cv_std", 0) > 0.04:  
+            unstable_models.append(model_name)
+            st.warning(
+                f"⚠️ **{model_name} is unstable!** "
+                f"It showed high variance during 5-fold cross-validation (Std Dev: {metrics['cv_std']}). "
+                f"It might be overfitting to specific chunks of data."
+            )
+            
+    if not unstable_models:
+        st.success("✅ All models passed cross-validation stability checks (low variance).")
+    
+    st.markdown("---")
+
     # ── Metrics table ─────────────────────────────────────────────────────────
     st.subheader("📊 Model comparison")
 

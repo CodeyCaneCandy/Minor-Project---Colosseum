@@ -3,99 +3,354 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Colosseum | Session Setup</title>
+    <title>Colosseum | Automated Model Evaluator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🏛 Colosseum</h1>
-            <p>Automated Model Performance Evaluator</p>
-        </header>
 
-        <div class="setup-card">
-            <!-- STEP 1 -->
-            <section id="step-upload" class="step active">
-                <div class="step-header">
-                    <span>01</span> Upload Dataset 
-                    <div class="tooltip">ⓘ<span class="tooltiptext">Provide the raw data. Colosseum will automatically profile it.</span></div>
-                </div>
-                <input type="file" id="fileInput" hidden>
-                <div class="drop-zone" id="dropZone">
-                    <p>Drag & drop CSV or click to browse</p>
-                </div>
-                <div id="fileInfo" class="hidden">
-                    <p>Selected: <span id="fileName"></span></p>
-                    <button type="button" id="uploadBtn" class="btn-primary">Upload & Continue</button>
-                </div>
-            </section>
+<div class="scanline-overlay"></div>
 
-            <!-- STEP 2 -->
-            <section id="step-task" class="step">
-                <div class="step-header">
-                    <span>02</span> Select Task
-                    <div class="tooltip">ⓘ<span class="tooltiptext">Tell the engine what kind of problem you are solving so it loads the right models.</span></div>
-                </div>
-                <div class="grid-buttons">
-                    <button type="button" onclick="selectTask('classification', 'tabular')" class="task-btn">Tabular Classification</button>
-                    <button type="button" onclick="selectTask('regression', 'tabular')" class="task-btn">Tabular Regression</button>
-                    <button type="button" onclick="selectTask('classification', 'text')" class="task-btn">Text Classification</button>
-                </div>
-            </section>
+<div class="page-shell">
 
-            <!-- STEP 3 -->
-            <section id="step-config" class="step">
-                <div class="step-header">
-                    <span>03</span> Final Configuration
-                    <div class="tooltip">ⓘ<span class="tooltiptext">Specify the column you want to predict (Label) and any text features.</span></div>
+    <!-- ── SIDEBAR PROGRESS RAIL ─────────────────────────────── -->
+    <aside class="progress-rail">
+        <div class="rail-logo">
+            <span class="logo-glyph">⬡</span>
+            <span class="logo-text">COLOSSEUM</span>
+        </div>
+        <nav class="rail-steps">
+            <div class="rail-step active" id="rail-1">
+                <div class="rail-dot"><span>01</span></div>
+                <div class="rail-label">
+                    <div class="rail-title">INGEST</div>
+                    <div class="rail-sub">Upload dataset</div>
                 </div>
-                <div class="form-group">
-                    <label>Target Column (Label)</label>
-                    <input type="text" id="targetCol" placeholder="e.g. quality or sentiment">
+            </div>
+            <div class="rail-connector"></div>
+            <div class="rail-step" id="rail-2">
+                <div class="rail-dot"><span>02</span></div>
+                <div class="rail-label">
+                    <div class="rail-title">TASK</div>
+                    <div class="rail-sub">Define problem</div>
                 </div>
-                <div id="textColGroup" class="form-group hidden">
-                    <label>Text Column</label>
-                    <input type="text" id="textCol" placeholder="e.g. review_text">
+            </div>
+            <div class="rail-connector"></div>
+            <div class="rail-step" id="rail-3">
+                <div class="rail-dot"><span>03</span></div>
+                <div class="rail-label">
+                    <div class="rail-title">CONFIG</div>
+                    <div class="rail-sub">Set columns</div>
                 </div>
-                <button type="button" id="finishBtn" class="btn-primary">Lock Configuration</button>
-            </section>
+            </div>
+            <div class="rail-connector"></div>
+            <div class="rail-step" id="rail-4">
+                <div class="rail-dot"><span>04</span></div>
+                <div class="rail-label">
+                    <div class="rail-title">GAUNTLET</div>
+                    <div class="rail-sub">Run engine</div>
+                </div>
+            </div>
+        </nav>
+        <div class="rail-footer">
+            <div class="sys-status">
+                <span class="sys-dot" id="sysDot"></span>
+                <span id="sysLabel">IDLE</span>
+            </div>
+        </div>
+    </aside>
 
-            <!-- STEP 4: NEW LIVE STREAM UI -->
-            <section id="step-stream" class="step">
-                <div class="step-header">
-                    <span>04</span> Model Gauntlet (Live)
-                    <div class="tooltip">ⓘ<span class="tooltiptext">Watch Layer 3 filter out incompatible models in real-time before training begins.</span></div>
+    <!-- ── MAIN CONTENT ───────────────────────────────────────── -->
+    <main class="main-panel">
+
+        <!-- STEP 1: UPLOAD -->
+        <section id="step-upload" class="step active">
+            <div class="step-header">
+                <div class="step-tag">LAYER 1 — DATA INGESTION</div>
+                <h2>Upload Your Dataset</h2>
+                <p class="step-desc">Colosseum accepts CSV files for tabular or text classification tasks. The profiler will automatically analyse structure, missing values, cardinality, and class balance.</p>
+            </div>
+
+            <input type="file" id="fileInput" accept=".csv,.tsv" hidden>
+
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-inner">
+                    <div class="drop-icon">⬆</div>
+                    <div class="drop-text">Drag & drop your CSV here</div>
+                    <div class="drop-sub">or click anywhere in this zone to browse</div>
                 </div>
-                
-                <button type="button" id="startEvalBtn" class="btn-primary" style="margin-bottom: 20px;">🚀 Fire Up The Engine</button>
-                
-                <div class="layer3-container hidden" id="liveUiContainer">
+            </div>
+
+            <div id="fileInfo" class="file-meta hidden">
+                <div class="file-chip">
+                    <span class="file-chip-icon">◈</span>
+                    <span id="fileName">—</span>
+                    <span id="fileSize" class="file-size-badge">—</span>
+                </div>
+                <button type="button" id="uploadBtn" class="btn-primary">
+                    <span class="btn-text">Upload & Continue</span>
+                    <span class="btn-arrow">→</span>
+                </button>
+            </div>
+
+            <div class="info-grid">
+                <div class="info-tile">
+                    <div class="info-tile-label">Supported formats</div>
+                    <div class="info-tile-val">CSV · TSV</div>
+                </div>
+                <div class="info-tile">
+                    <div class="info-tile-label">Max recommended size</div>
+                    <div class="info-tile-val">~500 MB</div>
+                </div>
+                <div class="info-tile">
+                    <div class="info-tile-label">Smart sampling at</div>
+                    <div class="info-tile-val">15,000 rows</div>
+                </div>
+                <div class="info-tile">
+                    <div class="info-tile-label">Encoding fallback</div>
+                    <div class="info-tile-val">UTF-8 → Latin-1</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- STEP 2: TASK -->
+        <section id="step-task" class="step">
+            <div class="step-header">
+                <div class="step-tag">LAYER 1 — TASK ROUTING</div>
+                <h2>Select Problem Type</h2>
+                <p class="step-desc">This determines which models are loaded, which preprocessor runs, and which Layer 3 filter rules apply to your dataset profile.</p>
+            </div>
+
+            <div class="task-grid">
+                <button type="button" class="task-card" onclick="selectTask('classification', 'tabular')">
+                    <div class="task-card-icon">▦</div>
+                    <div class="task-card-title">Tabular Classification</div>
+                    <div class="task-card-desc">Structured rows and columns with a categorical target. Runs SVM, LogReg, KNN, Trees, RF, XGBoost.</div>
+                    <div class="task-card-models">7 candidate models</div>
+                </button>
+                <button type="button" class="task-card" onclick="selectTask('regression', 'tabular')">
+                    <div class="task-card-icon">⟋</div>
+                    <div class="task-card-title">Tabular Regression</div>
+                    <div class="task-card-desc">Structured data with a continuous numeric target. Optimised for RMSE and R² scoring.</div>
+                    <div class="task-card-models">5 candidate models</div>
+                </button>
+                <button type="button" class="task-card" onclick="selectTask('classification', 'text')">
+                    <div class="task-card-icon">⌘</div>
+                    <div class="task-card-title">Text Classification</div>
+                    <div class="task-card-desc">Raw text column with class labels. Uses TF-IDF or sentence embeddings based on your text length profile.</div>
+                    <div class="task-card-models">5 candidate models</div>
+                </button>
+            </div>
+        </section>
+
+        <!-- STEP 3: CONFIG -->
+        <section id="step-config" class="step">
+            <div class="step-header">
+                <div class="step-tag">LAYER 1 — COLUMN MAPPING</div>
+                <h2>Map Your Columns</h2>
+                <p class="step-desc">Tell Colosseum which column is the prediction target and (for text tasks) which column holds the raw text. Column names are case-sensitive.</p>
+            </div>
+
+            <div class="config-form">
+                <div class="field-group">
+                    <label class="field-label">TARGET COLUMN <span class="field-required">required</span></label>
+                    <input type="text" id="targetCol" class="field-input" placeholder="e.g.  quality   or   sentiment">
+                    <div class="field-hint">The column your models will learn to predict.</div>
+                </div>
+
+                <div id="textColGroup" class="field-group hidden">
+                    <label class="field-label">TEXT COLUMN <span class="field-required">required for text tasks</span></label>
+                    <input type="text" id="textCol" class="field-input" placeholder="e.g.  review   or   tweet_body">
+                    <div class="field-hint">The column containing raw natural language.</div>
+                </div>
+
+                <div class="split-row">
+                    <div class="field-group">
+                        <label class="field-label">TRAIN / TEST SPLIT</label>
+                        <div class="split-display-row">
+                            <input type="range" id="splitSlider" min="60" max="90" value="80" class="split-slider">
+                            <span id="splitLabel" class="split-label">80 / 20</span>
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <label class="field-label">RANDOM SEED</label>
+                        <input type="number" id="seedInput" class="field-input" value="42" min="0">
+                    </div>
+                </div>
+
+                <button type="button" id="finishBtn" class="btn-primary">
+                    <span class="btn-text">Lock Configuration & Arm Engine</span>
+                    <span class="btn-arrow">→</span>
+                </button>
+            </div>
+
+            <div class="config-preview hidden" id="configPreview">
+                <div class="preview-title">// SESSION MANIFEST</div>
+                <pre id="configPreviewJson" class="preview-json"></pre>
+            </div>
+        </section>
+
+        <!-- STEP 4: GAUNTLET -->
+        <section id="step-stream" class="step">
+            <div class="step-header">
+                <div class="step-tag">LAYERS 2–5 — FULL PIPELINE EXECUTION</div>
+                <h2>The Gauntlet</h2>
+                <p class="step-desc">Fires all layers in sequence: Profiler → Smart Sampler → Preprocessor → Model Filter → Parallel Training. Watch every decision in real time.</p>
+            </div>
+
+            <div id="launchState">
+                <button type="button" id="startEvalBtn" class="btn-launch">
+                    <span class="launch-glyph">⬡</span>
+                    <span>Fire Up The Engine</span>
+                </button>
+            </div>
+
+            <div id="liveUiContainer" class="live-ui hidden">
+
+                <!-- PIPELINE STAGE TRACKER -->
+                <div class="pipeline-tracker">
+                    <div class="pipe-stage" id="pipe-sample">
+                        <div class="pipe-icon">◈</div>
+                        <div class="pipe-info">
+                            <div class="pipe-name">LAYER 2.5 — SMART SAMPLER</div>
+                            <div class="pipe-status" id="ps-sample">Waiting...</div>
+                        </div>
+                        <div class="pipe-badge pending" id="pb-sample">PENDING</div>
+                    </div>
+                    <div class="pipe-arrow">↓</div>
+                    <div class="pipe-stage" id="pipe-profile">
+                        <div class="pipe-icon">◉</div>
+                        <div class="pipe-info">
+                            <div class="pipe-name">LAYER 2 — PROFILER</div>
+                            <div class="pipe-status" id="ps-profile">Waiting...</div>
+                        </div>
+                        <div class="pipe-badge pending" id="pb-profile">PENDING</div>
+                    </div>
+                    <div class="pipe-arrow">↓</div>
+                    <div class="pipe-stage" id="pipe-preprocess">
+                        <div class="pipe-icon">◧</div>
+                        <div class="pipe-info">
+                            <div class="pipe-name">LAYER 2 — PREPROCESSOR</div>
+                            <div class="pipe-status" id="ps-preprocess">Waiting...</div>
+                        </div>
+                        <div class="pipe-badge pending" id="pb-preprocess">PENDING</div>
+                    </div>
+                    <div class="pipe-arrow">↓</div>
+                    <div class="pipe-stage" id="pipe-filter">
+                        <div class="pipe-icon">⬡</div>
+                        <div class="pipe-info">
+                            <div class="pipe-name">LAYER 3 — MODEL FILTER</div>
+                            <div class="pipe-status" id="ps-filter">Waiting...</div>
+                        </div>
+                        <div class="pipe-badge pending" id="pb-filter">PENDING</div>
+                    </div>
+                    <div class="pipe-arrow">↓</div>
+                    <div class="pipe-stage" id="pipe-train">
+                        <div class="pipe-icon">▶</div>
+                        <div class="pipe-info">
+                            <div class="pipe-name">LAYER 5 — PARALLEL TRAINING</div>
+                            <div class="pipe-status" id="ps-train">Waiting...</div>
+                        </div>
+                        <div class="pipe-badge pending" id="pb-train">PENDING</div>
+                    </div>
+                </div>
+
+                <!-- GAUNTLET ARENA -->
+                <div class="gauntlet-arena">
                     <div class="model-roster">
-                        <h3>Master List</h3>
+                        <div class="roster-header">
+                            <span>MODEL ROSTER</span>
+                            <span id="rosterCount" class="roster-count">7 eligible</span>
+                        </div>
                         <ul id="model-list">
-                            <li id="model-SVM">SVM</li>
-                            <li id="model-LogReg">Logistic Regression</li>
-                            <li id="model-NaiveBayes">Naive Bayes</li>
-                            <li id="model-KNN">KNN</li>
-                            <li id="model-DecisionTree">Decision Tree</li>
-                            <li id="model-RandomForest">Random Forest</li>
-                            <li id="model-XGBoost">XGBoost</li>
+                            <li class="model-item" id="model-SVM">
+                                <span class="model-name">SVM</span>
+                                <span class="model-tag">kernel</span>
+                            </li>
+                            <li class="model-item" id="model-LogReg">
+                                <span class="model-name">Logistic Regression</span>
+                                <span class="model-tag">linear</span>
+                            </li>
+                            <li class="model-item" id="model-NaiveBayes">
+                                <span class="model-name">Naive Bayes</span>
+                                <span class="model-tag">probabilistic</span>
+                            </li>
+                            <li class="model-item" id="model-KNN">
+                                <span class="model-name">KNN</span>
+                                <span class="model-tag">distance</span>
+                            </li>
+                            <li class="model-item" id="model-DecisionTree">
+                                <span class="model-name">Decision Tree</span>
+                                <span class="model-tag">tree</span>
+                            </li>
+                            <li class="model-item" id="model-RandomForest">
+                                <span class="model-name">Random Forest</span>
+                                <span class="model-tag">ensemble</span>
+                            </li>
+                            <li class="model-item" id="model-XGBoost">
+                                <span class="model-name">XGBoost</span>
+                                <span class="model-tag">boosting</span>
+                            </li>
                         </ul>
                     </div>
+
                     <div class="live-log-panel">
-                        <h3>System Logs <span class="status-dot"></span></h3>
-                        <div id="log-feed" class="log-feed-container"></div>
+                        <div class="log-header">
+                            <span>SYSTEM LOG</span>
+                            <div class="ws-indicator">
+                                <span class="ws-dot" id="wsDot"></span>
+                                <span id="wsLabel">DISCONNECTED</span>
+                            </div>
+                        </div>
+                        <div id="log-feed" class="log-feed"></div>
                     </div>
                 </div>
 
-                <a href="http://localhost:8501" target="_blank" id="goToDashboardBtn" class="btn-success hidden" style="display:block; text-align:center; text-decoration:none; margin-top:20px;">📊 View Final Results in Dashboard</a>
-            </section>
-        </div>
+                <div id="winnerReveal" class="winner-reveal hidden">
+                    <div class="winner-label">⬡ ENGINE SELECTED WINNER</div>
+                    <div class="winner-name" id="winnerName">—</div>
+                    <a href="http://localhost:8501" target="_blank" class="btn-dashboard">
+                        Open Full Dashboard →
+                    </a>
+                </div>
 
-        <footer id="statusFooter">
-            Status: <span id="statusText">Waiting for upload...</span>
-        </footer>
-    </div>
-    <script src="app.js"></script>
+            </div>
+        </section>
+        
+        <section id="step-results" class="step">
+            <div class="step-header">
+                <div class="step-tag">LAYER 6 — INTELLIGENCE REPORT</div>
+                <h2>Final Evaluation</h2>
+            </div>
+
+            <div class="winner-reveal" style="display: block;">
+                <div class="winner-label" id="finalConfidence">HIGH CONFIDENCE WINNER</div>
+                <div class="winner-name" id="finalWinnerName">Random Forest</div>
+                <div class="step-desc" id="finalExplanation" style="margin-top: 15px; font-style: italic;">
+                    "Awaiting intelligence report..."
+                </div>
+            </div>
+
+            <div class="info-grid" id="metricsGrid" style="margin-top: 30px;">
+                </div>
+        </section>
+
+    </main>
+
+    <footer class="status-bar">
+        <div class="status-left">
+            <span id="statusText">READY</span>
+        </div>
+        <div class="status-right">
+            <span>COLOSSEUM v1.0</span>
+            <span class="status-sep">·</span>
+            <span id="statusTime">—</span>
+        </div>
+    </footer>
+
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>

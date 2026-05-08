@@ -25,10 +25,6 @@ app.include_router(upload_router, prefix="/api")
 app.include_router(task_router,   prefix="/api")
 app.include_router(config_router, prefix="/api")
 app.include_router(evaluate_router, prefix="/api")
-# ── OPTIONAL: health check ────────────────────────────────────────────────────
-@app.get("/api/health")
-def health():
-    return {"status": "ok"}
 
 # ── OPTIONAL: health check ────────────────────────────────────────────────────
 @app.get("/api/health")

@@ -1,93 +1,177 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import traceback
-import os # <-- Added for file paths
+import os 
+import pandas as pd
+from pathlib import Path
+from sklearn.model_selection import train_test_split
 
-# Import Layer 2 modules
+# Import Layer 2 & 4 modules
 from services.profiler.tabular_profiler import profile_tabular
 from services.profiler.text_profiler import profile_text
 from services.preprocessing.tabular_preprocess import DynamicPreprocessor
 from services.preprocessing.text_preprocess import TextPreprocessor
 
-# --- NEW LAYER 3 IMPORTS ---
+# Import Layer 3 modules
 from core.ws_manager import manager
 from core.schemas import DatasetProfile
 from layer3_filter.engine import DatasetModelFilter
+
+# Import Layer 5 module
+from layer5_training.runner import ModelRunner
 
 router = APIRouter()
 
 class EvaluateRequest(BaseModel):
     session: dict
 
+# ── LAYER 2.5: THE SMART SAMPLER ──────────────────────────────────────────────
+def smart_sample(df: pd.DataFrame, target_col: str, max_rows: int = 15000) -> tuple[pd.DataFrame, dict]:
+    """Trims massive datasets down using stratified sampling for speed."""
+    total_rows = len(df)
+    
+    if total_rows <= max_rows:
+        return df, {
+            "sampling_applied": False,
+            "original_rows": total_rows,
+            "sampled_rows": total_rows,
+            "sample_fraction": 1.0,
+            "reason": f"Dataset is under the {max_rows}-row threshold."
+        }
+
+    print(f"\n[LAYER 2.5] Dataset too large ({total_rows} rows). Trimming to {max_rows} rows...")
+    try:
+        sampled_df, _ = train_test_split(df, train_size=max_rows, stratify=df[target_col], random_state=42)
+    except Exception:
+        sampled_df = df.sample(n=max_rows, random_state=42)
+
+    report = {
+        "sampling_applied": True,
+        "original_rows": total_rows,
+        "sampled_rows": max_rows,
+        "sample_fraction": round(max_rows / total_rows, 3),
+        "reason": f"Capped at {max_rows:,} rows to ensure rapid model evaluation."
+    }
+    return sampled_df, report
+
+# ── API ENDPOINT ──────────────────────────────────────────────────────────────
 @router.post("/evaluate")
 async def run_evaluation(request: EvaluateRequest):
-    session = request.session
-    
+    # FIX 1: shallow copy so mutating dataset_path doesn't affect the caller's dict
+    session = dict(request.session)
+    temp_path = None  # FIX 2: declare here so finally block can always reference it
+
     try:
         task_type = session.get("file_type", "tabular")
+        dataset_path = session["dataset_path"]
+        target_column = session["target_column"]
         
-        # ── 1. TRIGGER PROFILER ───────────────────────────────────────────
+        # ── 0. LOAD AND SAMPLE DATA (Layer 2.5) ───────────────────────────
+        await manager.broadcast({"type": "stage", "stage": "sample", "status": "running", "msg": "Checking dataset size..."})
+        
+        df = pd.read_csv(dataset_path, sep=None, engine='python', encoding='latin-1')
+        
+        # --- THE SENTIMENT140 PATCH ---
+        if len(df.columns) == 6 and 'target' not in df.columns:
+            df = pd.read_csv(dataset_path, encoding='latin-1', header=None, names=['target', 'ids', 'date', 'flag', 'user', 'text'])
+        # ------------------------------
+        
+        df, sampling_report = smart_sample(df, target_column, max_rows=15000)
+        
+        # FIX 3: use Path.with_stem so multi-dot filenames (e.g. my.data.csv) don't break
+        p = Path(dataset_path)
+        temp_path = str(p.with_stem(p.stem + "_trimmed"))
+        df.to_csv(temp_path, index=False)
+        session["dataset_path"] = temp_path
+        
+        await manager.broadcast({"type": "stage", "stage": "sample", "status": "done", "msg": "Sampling complete."})
+        
+        # ── 1. TRIGGER PROFILER ────────────────────────────
+        await manager.broadcast({"type": "stage", "stage": "profile", "status": "running", "msg": "Analyzing dataset shape & cardinality..."})
+        
         if task_type == "tabular":
             profile = profile_tabular(
                 file_path=session["dataset_path"],
                 target_column=session["target_column"],
                 problem_type=session["problem_type"]
             )
-            
-            # ── 2. TRIGGER PREPROCESSOR ───────────────────────────────────
-            preprocessor = DynamicPreprocessor(
-                file_path=session["dataset_path"], 
-                target_col=session["target_column"]
-            )
-            processed_data = preprocessor.run(session)
-            
         elif task_type == "text":
             profile = profile_text(
                 file_path=session["dataset_path"],
                 text_column=session["text_column"],
                 target_column=session["target_column"]
             )
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported task type.")
             
-            # ── 2. TRIGGER PREPROCESSOR ───────────────────────────────────
+        await manager.broadcast({"type": "stage", "stage": "profile", "status": "done", "msg": "Profiling complete."})
+
+        # ── 2. TRIGGER PREPROCESSOR ────────────────────────────
+        await manager.broadcast({"type": "stage", "stage": "preprocess", "status": "running", "msg": "Imputing, Scaling & Encoding..."})
+        
+        if task_type == "tabular":
+            preprocessor = DynamicPreprocessor(
+                file_path=session["dataset_path"], 
+                target_col=session["target_column"]
+            )
+        elif task_type == "text":
             preprocessor = TextPreprocessor(
                 file_path=session["dataset_path"],
                 text_col=session["text_column"],
                 target_col=session["target_column"]
             )
-            processed_data = preprocessor.run(session)
             
-        else:
-            raise HTTPException(status_code=400, detail="Unsupported task type.")
+        processed_data = preprocessor.run(session)
+        await manager.broadcast({"type": "stage", "stage": "preprocess", "status": "done", "msg": "Data transformed to matrices."})
 
         # ── 3. TRIGGER LAYER 3 (The Model Filter) ────────────────────────
+        await manager.broadcast({"type": "stage", "stage": "filter", "status": "running", "msg": "Applying mathematical constraints..."})
         
-        # Find the YAML file dynamically so it doesn't break
         yaml_path = os.path.join(os.path.dirname(__file__), '..', 'layer3_filter', 'rules', 'master_rules.yaml')
-        
-        # A. Convert the raw dictionary into our strict Pydantic contract
         dataset_profile = DatasetProfile(**profile)
         
-        # B. Initialize the engine
         filter_engine = DatasetModelFilter(yaml_path)
-        
-        # C. Hook the logger to the WebSocket manager!
         filter_engine.logger.broadcast_callback = manager.broadcast
-        
-        # D. Run the gauntlet (This awaits the live stream)
         filter_results = await filter_engine.apply_rules(dataset_profile)
+        
+        await manager.broadcast({"type": "stage", "stage": "filter", "status": "done", "msg": "Unsuitable models excluded."})
 
-        # ── 4. RETURN FINAL RESPONSE ─────────────────────────────────────
+        # ── 5. TRIGGER LAYER 5 (The Parallel Training Engine) ────────────
+        await manager.broadcast({"type": "stage", "stage": "train", "status": "running", "msg": "Distributing models to CPU/GPU cores..."})
+        
+        ready_models = filter_results["ready_models"]
+        
+        X_train = processed_data["X_train"]
+        X_test = processed_data["X_test"]
+        y_train = processed_data["y_train"]
+        y_test = processed_data["y_test"]
+        
+        runner = ModelRunner()
+        final_results = runner.train_and_evaluate(ready_models, X_train, X_test, y_train, y_test)
+        
+        await manager.broadcast({"type": "stage", "stage": "train", "status": "done", "msg": "Training and cross-validation complete."})
+        
+        # Inject the sampling report so Streamlit/Frontend can display it!
+        final_results["sampling_report"] = sampling_report
+        
+        project_root = Path(__file__).resolve().parent.parent.parent
+        results_file = project_root / "data" / "features" / "results.json"
+        
+        runner.save_results(final_results, results_file)
+
         return {
             "status": "success", 
-            "message": "Layer 2 Profiling, Preprocessing, and Layer 3 Filtering complete!",
-            "profile_summary": profile["summary"],
-            "layer3_results": filter_results, # <-- Added the final model list here!
-            "data_shapes": {
-                "X_train": list(processed_data["X_train"].shape),
-                "X_test": list(processed_data["X_test"].shape)
-            }
+            "message": "All Layers complete! Results saved to disk.",
+            "winner": final_results["winner"]["name"],
+            # Passing the full results back directly helps if the frontend wants to render immediately
+            "results": final_results 
         }
 
     except Exception as e:
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        # FIX 2: temp file is always deleted — even if an exception was raised mid-pipeline
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)

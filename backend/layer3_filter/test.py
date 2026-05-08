@@ -1,3 +1,12 @@
+import asyncio
+import sys
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from core.schemas import DatasetProfile, DatasetFlags
+from layer3_filter.engine import DatasetModelFilter   # ADD THIS — it's missing
+
 # --- QUICK TEST ---
 if __name__ == "__main__":
     from core.schemas import DatasetProfile, DatasetFlags
@@ -22,7 +31,7 @@ if __name__ == "__main__":
     # 2. Run the engine (make sure the path matches where you saved your YAML)
     print("\n--- Starting Colosseum Model Filter ---")
     filter_engine = DatasetModelFilter("rules/master_rules.yaml")
-    results = filter_engine.apply_rules(mock_dataset)
+    results = asyncio.run(filter_engine.apply_rules(mock_dataset))
     
     print("\n--- Final Results ---")
     print(f"Models Ready for Training: {results['ready_models']}")
