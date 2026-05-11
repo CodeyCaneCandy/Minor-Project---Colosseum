@@ -9,6 +9,18 @@ rules:
 
   # ─── 2. DATA TYPE & DOMAIN CONSTRAINTS ─────────────────────────────────────
 
+  - id: "rule_text_svm_bottleneck"
+    condition: "dtype == 'text'"
+    action: "exclude"
+    target: ["SVM"]
+    reason: "SVM scales quadratically (O(n²)) and will bottleneck on high-dimensional text features."
+
+  - id: "rule_text_rf_bottleneck"
+    condition: "dtype == 'text'"
+    action: "exclude"
+    target: ["RandomForest"]
+    reason: "Standard CPU-bound Random Forests are excessively slow on sparse text matrices."
+
   - id: "rule_text_classical_exclusion"
     condition: "dtype == 'text' and flags.is_long_text == true"
     action: "exclude"

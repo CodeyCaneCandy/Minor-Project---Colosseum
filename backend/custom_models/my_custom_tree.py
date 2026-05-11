@@ -1,4 +1,4 @@
-from sklearn.ensemble import ExtraTreesClassifier
+'''from sklearn.ensemble import ExtraTreesClassifier
 
 class UltraRandomTree:
     """A custom algorithm dropped in by the user."""
@@ -12,4 +12,5 @@ class UltraRandomTree:
         
     def predict(self, X):
         # The runner requires a .predict() method
-        return self.model.predict(X)
+        return self.model.predict(X)'''
+    

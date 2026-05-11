@@ -47,7 +47,7 @@ class TextPreprocessor:
         """Path A: TF-IDF Vectorization"""
         print("[pipeline]  Applying TF-IDF Vectorizer...")
         self.vectorizer = TfidfVectorizer(
-            max_features=10000, 
+            max_features=1500, 
             stop_words='english',
             ngram_range=(1, 2)
         )

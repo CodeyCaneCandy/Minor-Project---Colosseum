@@ -60,12 +60,12 @@ class WeightedRanker:
         confidence = self.evaluate_confidence(ranked_models)
         
         # Build the dynamic explanation
-        if confidence["level"] == "high":
-            explanation = f"{winner_name} was the clear winner, outperforming the runner-up ({ranked_models[1][0]}) by a definitive margin of {confidence['value']}%."
-        elif confidence["level"] == "medium":
-            explanation = f"{winner_name} narrowly beat {ranked_models[1][0]}. Both models performed well, achieving high overall stability."
+        # Safely generate the explanation depending on how many models survived
+        if len(ranked_models) > 1:
+            runner_up_name = ranked_models[1][0]
+            explanation = f"{winner_name} was the clear winner, outperforming the runner-up ({runner_up_name}) by a margin of {confidence['value']}%."
         else:
-            explanation = f"It was a statistical tie between {winner_name} and {ranked_models[1][0]} (Score gap: {confidence['value']}%). You should check deployment efficiency metrics to make a final decision."
+            explanation = f"{winner_name} was the only model to successfully survive the Gauntlet and complete training."
 
         # Re-pack the models dict cleanly for the UI
         clean_models = {}

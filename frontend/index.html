@@ -7,6 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> </head>
 </head>
 <body>
 
@@ -334,6 +336,15 @@
 
             <div class="info-grid" id="metricsGrid" style="margin-top: 30px;">
                 </div>
+
+            <div class="live-log-panel" style="margin-top: 30px;">
+                <div class="log-header">
+                    <span>COMPOSITE SCORE COMPARISON</span>
+                </div>
+                <div style="padding: 20px; height: 300px; position: relative;">
+                    <canvas id="comparisonChart"></canvas>
+                </div>
+            </div>
         </section>
 
     </main>

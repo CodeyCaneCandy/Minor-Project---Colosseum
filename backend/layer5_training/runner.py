@@ -37,8 +37,15 @@ class ModelRunner:
             "Naive Bayes": GaussianNB(),
             "Decision Tree": DecisionTreeClassifier(random_state=42)
         }
+        
+        # --- NATIVE GPU ACCELERATION FOR XGBOOST ---
         if xgb:
-            self.model_catalog["XGBoost"] = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)
+            self.model_catalog["XGBoost"] = xgb.XGBClassifier(
+                eval_metric='logloss', 
+                tree_method='hist',    # Enables histogram-based training (optimized)
+                device='cuda',         # Forces the math onto the CUDA cores
+                random_state=42
+            )
         
         # --- NEW: SCAN FOR CUSTOM PLUGINS ---
         self._load_custom_models()
@@ -118,14 +125,14 @@ class ModelRunner:
             for name in active_models if name in self.model_catalog
         ]
         
-        print(f"[LAYER 5] Dispatching {len(models_to_run)} models to parallel worker pool...")
+        print(f"[LAYER 5] Training {len(models_to_run)} models sequentially...")
         
-        # Run all models in parallel!
-        parallel_results = Parallel(n_jobs=-1)(
-            delayed(self._train_single_model)(
-                name, model, X_train, X_test, y_train, y_test, classes
-            ) for name, model in models_to_run
-        )
+        # Run sequentially to prevent joblib IPC memory deadlocks
+        parallel_results = []
+        for name, model in models_to_run:
+            print(f"[pipeline] Training {name}...")
+            res = self._train_single_model(name, model, X_train, X_test, y_train, y_test, classes)
+            parallel_results.append(res)
         
         # Reformat the parallel results into a dictionary
         final_models = {}

@@ -1,0 +1,113 @@
+================================================================================
+COLOSSEUM: MACHINE LEARNING METRICS & FORMULAS REFERENCE
+================================================================================
+
+This document outlines the core mathematical formulas and evaluation metrics 
+used within the Colosseum Engine (Layer 5) to evaluate, rank, and score models.
+
+--------------------------------------------------------------------------------
+1. CLASSIFICATION METRICS (Categorical Targets)
+--------------------------------------------------------------------------------
+These metrics rely on the Confusion Matrix components:
+- TP (True Positives): Model predicted positive, actual is positive.
+- TN (True Negatives): Model predicted negative, actual is negative.
+- FP (False Positives): Model predicted positive, actual is negative (Type I Error).
+- FN (False Negatives): Model predicted negative, actual is positive (Type II Error).
+
+1. Accuracy
+- Definition: The overall percentage of correct predictions.
+- Formula: Accuracy = (TP + TN) / (TP + TN + FP + FN)
+- Sklearn: accuracy_score(y_true, y_pred)
+- Note: Highly misleading on imbalanced datasets.
+
+2. Precision
+- Definition: Out of all positive predictions, how many were actually positive?
+- Formula: Precision = TP / (TP + FP)
+- Sklearn: precision_score(y_true, y_pred, average='weighted')
+- Note: Use when the cost of False Positives is high.
+
+3. Recall (Sensitivity)
+- Definition: Out of all actual positives, how many did the model correctly find?
+- Formula: Recall = TP / (TP + FN)
+- Sklearn: recall_score(y_true, y_pred, average='weighted')
+- Note: Use when the cost of False Negatives is high (e.g., medical diagnosis).
+
+4. F1-Score
+- Definition: The harmonic mean of Precision and Recall.
+- Formula: F1 = 2 * (Precision * Recall) / (Precision + Recall)
+- Sklearn: f1_score(y_true, y_pred, average='weighted')
+- Note: The gold standard for datasets with severe class imbalance.
+
+5. ROC-AUC (Receiver Operating Characteristic - Area Under Curve)
+- Definition: Measures the ability to distinguish between classes across all thresholds.
+- Scale: 0.5 (Random Guess) to 1.0 (Perfect Classification).
+- Sklearn: roc_auc_score(y_true, y_prob)
+
+
+--------------------------------------------------------------------------------
+2. REGRESSION METRICS (Continuous Numeric Targets)
+--------------------------------------------------------------------------------
+These metrics measure the distance between the actual value (y) and prediction (y_hat).
+n = total number of samples.
+
+1. MAE (Mean Absolute Error)
+- Definition: The average absolute distance between prediction and true value.
+- Formula: MAE = (1/n) * Σ |y_i - y_hat_i|
+- Sklearn: mean_absolute_error(y_true, y_pred)
+
+2. MSE (Mean Squared Error)
+- Definition: Squares the distances before averaging, heavily penalizing outliers.
+- Formula: MSE = (1/n) * Σ (y_i - y_hat_i)^2
+- Sklearn: mean_squared_error(y_true, y_pred)
+
+3. RMSE (Root Mean Squared Error)
+- Definition: The square root of MSE, returning the metric to the original unit.
+- Formula: RMSE = √MSE
+- Sklearn: np.sqrt(mean_squared_error(y_true, y_pred))
+
+4. R² (Coefficient of Determination)
+- Definition: Proportion of variance in the target variable predicted by the model.
+- Formula: R² = 1 - [ Σ(y_i - y_hat_i)^2 / Σ(y_i - y_mean)^2 ]
+- Sklearn: r2_score(y_true, y_pred)
+- Scale: 1.0 is perfect; 0.0 acts like a model always predicting the mean.
+
+5. MAPE (Mean Absolute Percentage Error)
+- Definition: Expresses error as an average percentage.
+- Formula: MAPE = (100% / n) * Σ |(y_i - y_hat_i) / y_i|
+- Sklearn: mean_absolute_percentage_error(y_true, y_pred)
+
+
+--------------------------------------------------------------------------------
+3. EFFICIENCY METRICS (Deployment Constraints)
+--------------------------------------------------------------------------------
+1. Training Wall-Clock Time
+- Definition: Seconds required to execute model.fit().
+- Python implementation: time.perf_counter() difference.
+
+2. Prediction Latency
+- Definition: Milliseconds required to execute model.predict() on a single sample.
+- Crucial for real-time high-frequency inference (e.g., trading, self-driving).
+
+3. Serialized Model Size
+- Definition: Disk space (MB) required to store the trained model parameters.
+- Python implementation: joblib.dump() followed by os.path.getsize().
+
+
+--------------------------------------------------------------------------------
+4. RANKING ENGINE & BUSINESS LOGIC (Colosseum Custom Math)
+--------------------------------------------------------------------------------
+1. Weighted Composite Score (S)
+- Definition: A single unified score balancing multiple metrics and penalties.
+- Formula (Classification): 
+  S = (w_1 * F1) + (w_2 * ROC_AUC) + (w_3 * Accuracy) - Size_Penalty
+  *Default Config: w_1=0.45, w_2=0.35, w_3=0.20*
+- Formula (Regression):
+  S = (w_1 * R²) - (w_2 * RMSE) - Size_Penalty
+
+2. Statistical Confidence Score (C)
+- Definition: Measures how definitively the 1st place model beat the 2nd place model.
+- Formula: C = [(S_1 - S_2) / S_1] * 100
+- Thresholds:
+   > 15.0% : "HIGH CONFIDENCE" (Clear Winner)
+   5.0% - 15.0% : "MEDIUM CONFIDENCE"
+   < 5.0% : "LOW CONFIDENCE" (Statistical Tie, defer to efficiency constraints)

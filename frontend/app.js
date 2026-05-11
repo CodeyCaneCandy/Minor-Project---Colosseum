@@ -12,7 +12,7 @@ const state = {
     fileType: 'tabular',
     socket: null
 };
-
+let comparisonChartInstance = null;
 // =========================================================
 // DOM REFERENCES
 // =========================================================
@@ -560,7 +560,7 @@ async function startEvaluation() {
     }
 }
 
-function revealWinner(result) {
+function revealWinner(data) {
     // 1. Hide the live stream UI
     dom.steps['stream'].classList.remove('active');
     
@@ -568,15 +568,114 @@ function revealWinner(result) {
     const resultsStep = document.getElementById('step-results');
     resultsStep.classList.add('active');
 
-    // 3. Populate the data
-    document.getElementById('finalWinnerName').innerText = result.winner.name;
-    document.getElementById('finalExplanation').innerText = result.explanation;
-    document.getElementById('finalConfidence').innerText = `${result.confidence.level.toUpperCase()} CONFIDENCE`;
+    const res = data.results; 
+    const winnerData = res.models[res.winner.name];
 
-    // 4. Update the sidebar rail to show we are done!
+    // 3. Populate the Hero Card
+    document.getElementById('finalWinnerName').innerText = res.winner.name;
+    document.getElementById('finalExplanation').innerText = `"${res.explanation}"`;
+    
+    const confLabel = document.getElementById('finalConfidence');
+    confLabel.innerText = `${res.confidence.level.toUpperCase()} CONFIDENCE (${res.confidence.value}%)`;
+    
+    if (res.confidence.level === 'high') confLabel.style.color = 'var(--green)';
+    if (res.confidence.level === 'medium') confLabel.style.color = 'var(--amber)';
+    if (res.confidence.level === 'low') confLabel.style.color = 'var(--red)';
+
+   // 4. Populate Metrics (Defaults to the winner on load)
+    updateMetricsPanel(res.winner.name, winnerData, true);
+    
+    
+    ['accuracy', 'f1', 'roc_auc'].forEach(metric => {
+        if (winnerData.metrics && winnerData.metrics[metric] !== undefined) {
+            metricsGrid.innerHTML += `
+                <div class="info-tile">
+                    <div class="info-tile-label">${metric.replace('_', ' ').toUpperCase()}</div>
+                    <div class="info-tile-val" style="font-size: 20px;">${winnerData.metrics[metric].toFixed(4)}</div>
+                </div>`;
+        }
+    });
+
+    // 5. Update Rail and Draw Chart
     markRailStep(4, 'done');
+    renderChart(res.models);
 }
 
+// =========================================================
+// INTERACTIVE METRICS UPDATER
+// =========================================================
+function updateMetricsPanel(modelName, modelData, isWinner = false) {
+    const metricsGrid = document.getElementById('metricsGrid');
+    metricsGrid.innerHTML = ''; // Clear previous tiles
+
+    // Change the panel header dynamically
+    const headerSpan = document.querySelector('#step-results .live-log-panel:first-child .log-header span');
+    if (headerSpan) {
+        headerSpan.innerText = isWinner ? 'WINNER TELEMETRY' : `${modelName.toUpperCase()} TELEMETRY`;
+    }
+
+    // Add Composite Score Tile
+    metricsGrid.innerHTML += `
+        <div class="info-tile" style="border-color: ${isWinner ? 'var(--accent)' : 'var(--border-hi)'}; transition: all 0.3s ease;">
+            <div class="info-tile-label" style="color: ${isWinner ? 'var(--accent)' : 'var(--text-muted)'};">COMPOSITE SCORE</div>
+            <div class="info-tile-val" style="font-size: 24px;">${modelData.composite_score.toFixed(4)}</div>
+        </div>`;
+    
+    // Add the other 3 tiles
+    ['accuracy', 'f1', 'roc_auc'].forEach(metric => {
+        if (modelData.metrics && modelData.metrics[metric] !== undefined) {
+            metricsGrid.innerHTML += `
+                <div class="info-tile" style="transition: all 0.3s ease;">
+                    <div class="info-tile-label">${metric.replace('_', ' ').toUpperCase()}</div>
+                    <div class="info-tile-val" style="font-size: 20px;">${modelData.metrics[metric].toFixed(4)}</div>
+                </div>`;
+        }
+    });
+}
+
+function renderChart(modelsData) {
+    const canvas = document.getElementById('comparisonChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (comparisonChartInstance) comparisonChartInstance.destroy();
+    
+    const modelNames = Object.keys(modelsData);
+    const scores = modelNames.map(name => modelsData[name].composite_score);
+    
+    comparisonChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: modelNames,
+            datasets: [{
+                label: 'Composite Score', data: scores,
+                backgroundColor: 'rgba(0, 212, 255, 0.4)', borderColor: 'rgba(0, 212, 255, 1)',
+                borderWidth: 1, borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            
+            // --- ADD THIS ONCLICK HANDLER ---
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const barIndex = elements[0].index;
+                    const clickedModelName = modelNames[barIndex];
+                    const clickedModelData = modelsData[clickedModelName];
+                    
+                    // Update the tiles when a bar is clicked!
+                    updateMetricsPanel(clickedModelName, clickedModelData, false);
+                }
+            },
+            // --------------------------------
+
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#4a6478' } },
+                y: { grid: { display: false }, ticks: { color: '#c9d8e8', font: { family: 'JetBrains Mono' } } }
+            }
+        }
+    });
+}
 // =========================================================
 // START BUTTON
 // =========================================================
