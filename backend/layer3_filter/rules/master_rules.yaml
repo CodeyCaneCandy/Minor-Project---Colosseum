@@ -1,0 +1,56 @@
+rules:
+  # ─── 1. SIZE & HARDWARE CONSTRAINTS ────────────────────────────────────────
+
+  - id: "rule_svm_size_limit"
+    condition: "n_rows > 100000"
+    action: "exclude"
+    target: ["SVM"]
+    reason: "SVM training complexity is O(n^2) — prohibitively slow for datasets over 100k rows."
+
+  # ─── 2. DATA TYPE & DOMAIN CONSTRAINTS ─────────────────────────────────────
+
+  - id: "rule_text_svm_bottleneck"
+    condition: "dtype == 'text'"
+    action: "exclude"
+    target: ["SVM"]
+    reason: "SVM scales quadratically (O(n²)) and will bottleneck on high-dimensional text features."
+
+  - id: "rule_text_rf_bottleneck"
+    condition: "dtype == 'text'"
+    action: "exclude"
+    target: ["RandomForest"]
+    reason: "Standard CPU-bound Random Forests are excessively slow on sparse text matrices."
+
+  - id: "rule_text_classical_exclusion"
+    condition: "dtype == 'text' and flags.is_long_text == true"
+    action: "exclude"
+    target: ["KNN", "DecisionTree"]
+    reason: "Distance-based and basic tree models perform poorly on high-dimensional long text features."
+
+  - id: "rule_tabular_text_bleed"
+    condition: "dtype == 'tabular' and flags.has_text_features == true"
+    action: "exclude"
+    target: ["KNN", "NaiveBayes"]
+    reason: "Tabular dataset contains text-like columns. Distance-based models cannot process raw string matrices."
+
+  # ─── 3. IMBALANCE & METRIC WARNINGS ────────────────────────────────────────
+
+  - id: "rule_imbalance_metric_flag"
+    condition: "flags.imbalanced == true"
+    action: "warn"
+    target: ["All"] # 'All' is a keyword we will catch in our engine logic
+    reason: "High class imbalance detected. Accuracy will be misleading; F1-macro or ROC-AUC is recommended."
+
+  # ─── 4. DATA QUALITY FLAGS ─────────────────────────────────────────────────
+
+  - id: "rule_high_cardinality_memory"
+    condition: "dtype == 'tabular' and flags.high_cardinality == true"
+    action: "warn"
+    target: ["LogReg", "KNN"]
+    reason: "High cardinality features detected. One-hot encoding may cause memory spikes. Tree-based models are safer."
+
+  - id: "rule_heavy_missing_data"
+    condition: "flags.high_missing == true"
+    action: "restrict"
+    target: ["RandomForest", "XGBoost"]
+    reason: "Dataset has >30% missing values in some columns. Aggressive imputation strategies will be enforced."
