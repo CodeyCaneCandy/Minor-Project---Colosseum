@@ -275,6 +275,9 @@ async function uploadDataset() {
         }
 
         state.session = data.session;
+        // Expose to chatbot
+        window.colonneState = window.colonneState || {};
+        window.colonneState.session = state.session;
 
         updateStatus('Upload complete');
         updateSystemStatus('done', 'UPLOAD COMPLETE');
@@ -561,6 +564,13 @@ async function startEvaluation() {
 }
 
 function revealWinner(data) {
+    // Expose results to chatbot widget
+    window.colonneState = window.colonneState || {};
+    window.colonneState.results = data.results;
+    window.colonneState.session = state.session;
+    if (typeof window.chatbotOnResults === 'function') {
+        window.chatbotOnResults(data.results, state.session);
+    }
     // 1. Hide the live stream UI
     dom.steps['stream'].classList.remove('active');
     
@@ -584,17 +594,6 @@ function revealWinner(data) {
 
    // 4. Populate Metrics (Defaults to the winner on load)
     updateMetricsPanel(res.winner.name, winnerData, true);
-    
-    
-    ['accuracy', 'f1', 'roc_auc'].forEach(metric => {
-        if (winnerData.metrics && winnerData.metrics[metric] !== undefined) {
-            metricsGrid.innerHTML += `
-                <div class="info-tile">
-                    <div class="info-tile-label">${metric.replace('_', ' ').toUpperCase()}</div>
-                    <div class="info-tile-val" style="font-size: 20px;">${winnerData.metrics[metric].toFixed(4)}</div>
-                </div>`;
-        }
-    });
 
     // 5. Update Rail and Draw Chart
     markRailStep(4, 'done');
