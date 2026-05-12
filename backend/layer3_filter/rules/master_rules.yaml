@@ -54,3 +54,26 @@ rules:
     action: "restrict"
     target: ["RandomForest", "XGBoost"]
     reason: "Dataset has >30% missing values in some columns. Aggressive imputation strategies will be enforced."
+
+  # ─── 5. IMAGE DATA CONSTRAINTS ─────────────────────────────────────────────
+# Add this block to backend/layer3_filter/rules/master_rules.yaml
+
+image_data_safeguards:
+  description: "Aggressively exclude models that cannot handle massive dimensionality from flattened images."
+  conditions:
+    - "file_type == 'image'"
+  actions:
+    # KNN calculates distance between all points. With 50k features, it will freeze.
+    exclude_KNN:
+      target: "KNN"
+      reason: "Distance computations scale terribly with high-dimensional image vectors (O(N*D))."
+    
+    # Standard Decision Trees will overfit immediately on pixel data.
+    exclude_DecisionTree:
+      target: "Decision Tree"
+      reason: "Single trees branch poorly on individual pixel intensities and are highly prone to severe overfitting."
+    
+    # Warn about SVM (it works, but takes forever unless it's a linear kernel)
+    warn_SVM:
+      target: "SVM"
+      reason: "SVMs on un-reduced image spaces are extremely computationally expensive. RBF kernels may stall."

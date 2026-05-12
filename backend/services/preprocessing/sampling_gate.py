@@ -146,6 +146,18 @@ def apply_sampling_gate(
     return df_sampled, report
 
 
+def sample_images(image_paths: list, labels: list, max_images: int = 5000):
+    """Trims image dataset size while maintaining class balance."""
+    if len(image_paths) <= max_images:
+        return image_paths, labels
+        
+    from sklearn.model_selection import train_test_split
+    sampled_paths, _, sampled_labels, _ = train_test_split(
+        image_paths, labels, train_size=max_images, stratify=labels, random_state=42
+    )
+    return sampled_paths, sampled_labels
+
+
 # ── STANDALONE TEST ───────────────────────────────────────────────────────────
 if __name__ == "__main__":
     from pathlib import Path

@@ -11,7 +11,7 @@ from services.profiler.tabular_profiler import profile_tabular
 from services.profiler.text_profiler import profile_text
 from services.preprocessing.tabular_preprocess import DynamicPreprocessor
 from services.preprocessing.text_preprocess import TextPreprocessor
-
+from services.preprocessing.image_preprocess import ImagePreprocessor
 # Import Layer 3 modules
 from core.ws_manager import manager
 from core.schemas import DatasetProfile
@@ -25,7 +25,7 @@ router = APIRouter()
 class EvaluateRequest(BaseModel):
     session: dict
 
-# ── LAYER 2.5: THE SMART SAMPLER ──────────────────────────────────────────────
+# ── LAYER 1.5: THE SMART SAMPLER ──────────────────────────────────────────────
 def smart_sample(df: pd.DataFrame, target_col: str, max_rows: int = 15000) -> tuple[pd.DataFrame, dict]:
     """Trims massive datasets down using stratified sampling for speed."""
     total_rows = len(df)
@@ -39,7 +39,7 @@ def smart_sample(df: pd.DataFrame, target_col: str, max_rows: int = 15000) -> tu
             "reason": f"Dataset is under the {max_rows}-row threshold."
         }
 
-    print(f"\n[LAYER 2.5] Dataset too large ({total_rows} rows). Trimming to {max_rows} rows...")
+    print(f"\n[LAYER 1.5] Dataset too large ({total_rows} rows). Trimming to {max_rows} rows...")
     try:
         sampled_df, _ = train_test_split(df, train_size=max_rows, stratify=df[target_col], random_state=42)
     except Exception:
@@ -57,50 +57,65 @@ def smart_sample(df: pd.DataFrame, target_col: str, max_rows: int = 15000) -> tu
 # ── API ENDPOINT ──────────────────────────────────────────────────────────────
 @router.post("/evaluate")
 async def run_evaluation(request: EvaluateRequest):
-    # FIX 1: shallow copy so mutating dataset_path doesn't affect the caller's dict
     session = dict(request.session)
-    temp_path = None  # FIX 2: declare here so finally block can always reference it
+    temp_path = None  
 
     try:
         task_type = session.get("file_type", "tabular")
         dataset_path = session["dataset_path"]
-        target_column = session["target_column"]
         
-        # ── 0. LOAD AND SAMPLE DATA (Layer 2.5) ───────────────────────────
+        # Safely get target_column (Images don't have one in the UI)
+        target_column = session.get("target_column", "folder_names")
+        
+        # ── 0. LOAD AND SAMPLE DATA (Layer 1.5) ───────────────────────────
         await manager.broadcast({"type": "stage", "stage": "sample", "status": "running", "msg": "Checking dataset size..."})
         
-        df = pd.read_csv(dataset_path, sep=None, engine='python', encoding='latin-1')
-        
-        # --- THE SENTIMENT140 PATCH ---
-        if len(df.columns) == 6 and 'target' not in df.columns:
-            df = pd.read_csv(dataset_path, encoding='latin-1', header=None, names=['target', 'ids', 'date', 'flag', 'user', 'text'])
-        # ------------------------------
-        
-        df, sampling_report = smart_sample(df, target_column, max_rows=15000)
-        
-        # FIX 3: use Path.with_stem so multi-dot filenames (e.g. my.data.csv) don't break
-        p = Path(dataset_path)
-        temp_path = str(p.with_stem(p.stem + "_trimmed"))
-        df.to_csv(temp_path, index=False)
-        session["dataset_path"] = temp_path
-        
-        await manager.broadcast({"type": "stage", "stage": "sample", "status": "done", "msg": "Sampling complete."})
+        if task_type == "image":
+            # SKIP PANDAS: Images are handled by the ImagePreprocessor
+            sampling_report = {"reason": "Image dataset. Sampling deferred to image preprocessor."}
+            await manager.broadcast({"type": "stage", "stage": "sample", "status": "done", "msg": "Image directory validated."})
+        else:
+            # ORIGINAL TABULAR/TEXT LOGIC
+            df = pd.read_csv(dataset_path, sep=None, engine='python', encoding='latin-1')
+            
+            if len(df.columns) == 6 and 'target' not in df.columns:
+                df = pd.read_csv(dataset_path, encoding='latin-1', header=None, names=['target', 'ids', 'date', 'flag', 'user', 'text'])
+            
+            df, sampling_report = smart_sample(df, target_column, max_rows=15000)
+            
+            p = Path(dataset_path)
+            temp_path = str(p.with_stem(p.stem + "_trimmed"))
+            df.to_csv(temp_path, index=False)
+            session["dataset_path"] = temp_path
+            
+            await manager.broadcast({"type": "stage", "stage": "sample", "status": "done", "msg": "Sampling complete."})
         
         # ── 1. TRIGGER PROFILER ────────────────────────────
         await manager.broadcast({"type": "stage", "stage": "profile", "status": "running", "msg": "Analyzing dataset shape & cardinality..."})
         
         if task_type == "tabular":
-            profile = profile_tabular(
-                file_path=session["dataset_path"],
-                target_column=session["target_column"],
-                problem_type=session["problem_type"]
-            )
+            profile = profile_tabular(session["dataset_path"], session["target_column"], session["problem_type"])
         elif task_type == "text":
-            profile = profile_text(
-                file_path=session["dataset_path"],
-                text_column=session["text_column"],
-                target_column=session["target_column"]
-            )
+            profile = profile_text(session["dataset_path"], session["text_column"], session["target_column"])
+        elif task_type == "image":
+            # --- UPDATED DUMMY PROFILE ---
+            # Giving Pydantic the required keys so DatasetProfile validation passes
+            profile = {
+                "dataset_type": "image",
+                "n_rows": 100,               # Dummy integer
+                "n_columns": 12288,          # Dummy integer (e.g., 64x64x3)
+                "dtype": "numeric",          # Dummy string
+                "missing_cells": 0,          # Assumed 0 for images
+                "target_type": "categorical",
+                "problem_type": "classification",
+                "flags": {
+                    
+                    "has_missing": False,
+                    "high_missing": False,
+                    "imbalanced": False,
+                    "large_dataset": False
+                }
+            }
         else:
             raise HTTPException(status_code=400, detail="Unsupported task type.")
             
@@ -110,16 +125,13 @@ async def run_evaluation(request: EvaluateRequest):
         await manager.broadcast({"type": "stage", "stage": "preprocess", "status": "running", "msg": "Imputing, Scaling & Encoding..."})
         
         if task_type == "tabular":
-            preprocessor = DynamicPreprocessor(
-                file_path=session["dataset_path"], 
-                target_col=session["target_column"]
-            )
+            preprocessor = DynamicPreprocessor(session["dataset_path"], session["target_column"])
         elif task_type == "text":
-            preprocessor = TextPreprocessor(
-                file_path=session["dataset_path"],
-                text_col=session["text_column"],
-                target_col=session["target_column"]
-            )
+            preprocessor = TextPreprocessor(session["dataset_path"], session["text_column"], session["target_column"])
+        elif task_type == "image":
+            # Import and trigger the new Image Preprocessor
+            from services.preprocessing.image_preprocess import ImagePreprocessor
+            preprocessor = ImagePreprocessor(target_size=(64, 64))
             
         processed_data = preprocessor.run(session)
         await manager.broadcast({"type": "stage", "stage": "preprocess", "status": "done", "msg": "Data transformed to matrices."})
@@ -151,7 +163,6 @@ async def run_evaluation(request: EvaluateRequest):
         
         await manager.broadcast({"type": "stage", "stage": "train", "status": "done", "msg": "Training and cross-validation complete."})
         
-        # Inject the sampling report so Streamlit/Frontend can display it!
         final_results["sampling_report"] = sampling_report
         
         project_root = Path(__file__).resolve().parent.parent.parent
@@ -159,7 +170,6 @@ async def run_evaluation(request: EvaluateRequest):
         
         runner.save_results(final_results, results_file)
 
-        # Safely extract full data, using defaults just in case runner.py was also reverted
         winner_obj = final_results.get("winner", {"name": "Unknown", "score": 0})
         if isinstance(winner_obj, str): 
             winner_obj = {"name": winner_obj, "score": 0}
@@ -170,14 +180,14 @@ async def run_evaluation(request: EvaluateRequest):
             "winner": winner_obj,
             "confidence": final_results.get("confidence", {"level": "high", "value": 100.0, "gap": 0}),
             "explanation": final_results.get("explanation", "Evaluation completed successfully."),
-            "results": final_results # Send the full payload for the charts!
+            "results": final_results 
         }
 
     except Exception as e:
+        import traceback
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
-        # FIX 2: temp file is always deleted — even if an exception was raised mid-pipeline
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
