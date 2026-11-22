@@ -1,0 +1,23 @@
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+
+numpy
+pandas
+scikit-learn
+joblib
+PyYAML
+rule-engine
+xgboost
+
+torch
+torchvision
+sentence-transformers
+opencv-python-headless
+
+groq
+
+# Optional analytics dashboard in frontend/app.py
+streamlit
+plotly

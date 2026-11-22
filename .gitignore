@@ -4,10 +4,11 @@ __pycache__/
 
 # Virtual environments
 venv/
-.env
+.venv/
 
-# Secrets
+# Environment files and secrets
 .env
+*.env
 gittoken.txt
 
 # Data (your local storage system)
@@ -19,5 +20,5 @@ data/features/
 .DS_Store
 
 # Logs
-*.loggittoken.txt
+*.log
 .env
