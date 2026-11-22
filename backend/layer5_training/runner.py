@@ -19,7 +19,10 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.tree import DecisionTreeClassifier
 try:
     import xgboost as xgb
-except ImportError:
+except Exception as exc:
+    # XGBoost may be installed but fail to load its native library (for example,
+    # when macOS is missing libomp). Keep the API usable with the other models.
+    print(f"[LAYER 5] XGBoost unavailable; continuing without it: {exc}")
     xgb = None
 
 # --- IMPORT OUR NEW MODULAR ENGINES ---
@@ -42,8 +45,8 @@ class ModelRunner:
         if xgb:
             self.model_catalog["XGBoost"] = xgb.XGBClassifier(
                 eval_metric='logloss', 
-                tree_method='hist',    # Enables histogram-based training (optimized)
-                device='cuda',         # Forces the math onto the CUDA cores
+                tree_method='hist',    # Efficient histogram-based training
+                device='cpu',         # Compatible with local machines without CUDA
                 random_state=42
             )
         
